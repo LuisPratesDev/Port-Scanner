@@ -1,39 +1,81 @@
-using System.Data;
-
+namespace Scanner.Parsers;
 internal static class ArgumentParser
 {
-    //valida os argumentos
-    //transforma na formatação correta
-    //retorna erros
-
-    //scan google.com 22
-    static void ValidateArgument(string[] args)
+    internal static Result<string[]> ValidateArgument(string[] args)
     {
-        //para um argumento ser válido ele precisa ter entre 3 a 4 argumentos
-        //converter o 1° para minúscula e o restante deixa igual
-        int count = args.Length;
+        //Verifico se há algum argumento
+        if (args.Length == 0) return Result<string[]>.Error(
+            "Não há nenhum argumento."
+        );
 
-        byte quantityArg = count > byte.MaxValue
-            ? throw new ArgumentException("Você excedeu o limite de argumentos permitido")
-            : (byte)count
-        ;
+        //verifico se o primeiro argumento é equivalente ao comando "scan"
+        if (!args[0].Equals("scan", StringComparison.InvariantCultureIgnoreCase)) return Result<string[]>.Error(
+            "O primeiro comando não é scan."
+        );
+
+        //verifica se tem menos que 3 elementos ou mais do que quatro elementos
+        if (args.Length < 3 || args.Length > 4) return Result<string[]>.Error(
+            "Argumentos insuficientes para continuar."
+        );
+
+        //retorna uma tupla com success caso o elemento correspondente ao indice é um número e retorna o valor do número
+        var elementSecondIsValid = IsValidIndex(args, 2) ? TryGetNumberArgument(args, 2) : (success: false, value: 0);
+        var elementThirdIsValid = IsValidIndex(args, 3) ? TryGetNumberArgument(args, 3) : (success: false, value: 0);
+
+        //verifico se existe um elemento correspondente ao indice 2 e verifico se esse elemento é um número e se é maior que 0
+        if (
+            IsValidIndex(args, 2) &&
+            !(
+                elementSecondIsValid.success &&
+                elementSecondIsValid.value > 0
+            )
+        ) return Result<string[]>.Error(
+            "O terceiro argumento é inválido"
+        );
+
+        /*
+            verifico se existe um elemento correspondente ao indice 3 e
+            verifico se esse elemento é um número e se é maior que elemento no indice 2
+        */
+        if (
+            IsValidIndex(args, 3) &&
+            !(
+                elementThirdIsValid.success &&
+                elementThirdIsValid.value > elementSecondIsValid.value
+            )
+        ) return Result<string[]>.Error(
+            "O quarto argumento é inválido"
+        );
         
-        //argumentos inválidos
-        //tudo que é menor ou igual a dois || maior que quatro é inválido, sobrando somente 3 ou o 4 como argumentos válidos
-        if (quantityArg <= 2 || quantityArg > 4) return;
-
-        //Nesta lista o primeiro comando estará em minúsculo
-        List<string> listArg = args.ToList();
-        listArg[0] = listArg.First().ToLower();
-
-       //verifico se o terceiro argumento é numérico
-       if (int.TryParse(listArg[2], out int arg3)) return;
-
-        //significa que existe um quarto argumento
-        if (listArg[2] != listArg.Last())
+        
+        //retorna o valor do array formatado corretamente
+        return Result<string[]>.Ok(
+            FormatArguments(args)
+        );
+    }
+    private static string[] FormatArguments(string[] args)
+    {
+        if (IsValidIndex(args, 3)) return new string[]
         {
-            //verifico se ele é numérico
-            if (int.TryParse(listArg[3], out int arg4)) return;
-        }
+          args[0].ToLowerInvariant(),
+          args[1],
+          args[2],
+          args[3]  
+        };
+
+        return new string[]
+        {
+            args[0].ToLowerInvariant(),
+            args[1],
+            args[2],
+        };
+    }
+    private static (bool success, int value) TryGetNumberArgument(string[] args, byte index)
+    {
+        return (int.TryParse(args[index], out int value), value);
+    }
+    private static bool IsValidIndex(string[] args, byte index)
+    {
+        return args.Length - 1 >= index;
     }
 }
