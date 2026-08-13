@@ -1,5 +1,4 @@
-using System.Runtime.InteropServices;
-
+namespace Scanner.Response;
 internal class Result<T>
 {
     //Data é as informações que poderam ser passadas
