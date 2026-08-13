@@ -1,3 +1,4 @@
+using Scanner.Response;
 namespace Scanner.Parsers;
 internal static class ArgumentParser
 {
