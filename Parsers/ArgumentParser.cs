@@ -23,12 +23,11 @@ internal static class ArgumentParser
         var elementSecondIsValid = IsValidIndex(args, 2) ? TryGetNumberArgument(args, 2) : (success: false, value: 0);
         var elementThirdIsValid = IsValidIndex(args, 3) ? TryGetNumberArgument(args, 3) : (success: false, value: 0);
 
-        //verifico se existe um elemento correspondente ao indice 2 e verifico se esse elemento é um número e se é maior que 0
+        //verifico se existe um elemento correspondente ao indice 2
         if (
             IsValidIndex(args, 2) &&
             !(
-                elementSecondIsValid.success &&
-                elementSecondIsValid.value > 0
+                elementSecondIsValid.success
             )
         ) return Result<string[]>.Error(
             "O terceiro argumento é inválido"
@@ -71,9 +70,9 @@ internal static class ArgumentParser
             args[2],
         };
     }
-    private static (bool success, int value) TryGetNumberArgument(string[] args, byte index)
+    private static (bool success, ushort value) TryGetNumberArgument(string[] args, byte index)
     {
-        return (int.TryParse(args[index], out int value), value);
+        return (ushort.TryParse(args[index], out ushort value), value);
     }
     private static bool IsValidIndex(string[] args, byte index)
     {
