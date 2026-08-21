@@ -1,8 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
+using Scanner.Interfaces;
 
 namespace Scanner.Models;
-class ScanResult
+class ScanResult : IResult
 {
     internal IPAddress IP { get; init;}
     internal ushort Port { get; init; }
