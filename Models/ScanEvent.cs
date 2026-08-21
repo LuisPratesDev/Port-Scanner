@@ -1,16 +1,18 @@
+using Scanner.Interfaces;
+
 namespace Scanner.Models;
 
 internal class ScanEvent
 {
-    internal Event.Type Event { get; init; }
-    internal Task Data { get; init;}
+    internal Event.Type Type { get; init; }
+    internal IResult Data { get; init; }
 
-    internal ScanEvent(Event.Type choiceEvent, Task data)
+    internal ScanEvent(Event.Type choiceEvent, IResult data)
     {
-        Event = choiceEvent;
+        Type = choiceEvent;
         Data = data;
     }
-    internal static ScanEvent Create(Event.Type choiceEvent, Task data)
+    internal static ScanEvent Create(Event.Type choiceEvent, IResult data)
     {
         return new ScanEvent(
             choiceEvent: choiceEvent,
