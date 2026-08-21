@@ -1,5 +1,7 @@
+using Scanner.Interfaces;
+
 namespace Scanner.Response;
-internal class Result<T>
+internal class Result<T> : IResult
 {
     //Data é as informações que poderam ser passadas
     internal T? Data { get; init; }
