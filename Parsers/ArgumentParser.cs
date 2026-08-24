@@ -17,16 +17,12 @@ internal static class ArgumentParser
 
         return tasks;
     }
-    //Retorna todas as portas válidas e inválidas
+    //Retorna todas as portas válidas
     internal static IEnumerable<Result<ushort>> ValidatePorts(HashSet<string> ports)
     {
         foreach(string port in ports)
         {
             if (ushort.TryParse(port, out ushort correctPort)) yield return Result<ushort>.Ok(correctPort);
-            
-            else yield return Result<ushort>.Error(
-                "Porta inválida"
-            );
         }
     }
 }
