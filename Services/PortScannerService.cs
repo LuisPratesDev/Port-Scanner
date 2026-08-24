@@ -6,6 +6,7 @@ using System.Net;
 
 internal class PortScannerService
 {
+    //Processa as informaçãos da UI
     internal IAsyncEnumerable<ScanResult> Processing(HashSet<string> address, HashSet<string> ports)
     {
         HashSet<Task<ScanEvent>> scanEvents = new();
@@ -22,6 +23,7 @@ internal class PortScannerService
 
         return Scan.ScannerPorts(scanEvents, resultPorts);
     }
+    //transforma um Task<Result<IPAddress[]>> para Task<ScanEvent>
     private async Task<ScanEvent> CreateScanEvent(Task<Result<IPAddress[]>> ip)
     {
         ScanEvent scanEvent = new ScanEvent(
