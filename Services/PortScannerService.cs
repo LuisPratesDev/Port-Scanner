@@ -17,7 +17,6 @@ internal class PortScannerService
         }
 
         HashSet<ushort> resultPorts = ArgumentParser.ValidatePorts(ports)
-        .Where(port => port.Success)
         .Select(port => port.Data)
         .ToHashSet();
 
