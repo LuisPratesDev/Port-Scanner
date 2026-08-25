@@ -22,6 +22,10 @@ class ScanResult : IResult
         this.Status = status;
         this.Duration = duration;
     }
+    public override string ToString()
+    {
+        return $"IP: {IP, -39} | Port: {Port, -5} | Status:{Status, -24} | Duration: {Duration.TotalMilliseconds:F2} ms";
+    }
     internal static ScanResult Create(IPAddress ip, ushort port, TimeSpan duration, SocketError status = SocketError.Success)
     {
         return new ScanResult(
