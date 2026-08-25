@@ -4,6 +4,7 @@ using Scanner.Parsers;
 using Scanner.Response;
 using System.Net;
 
+namespace Scanner.Services.PortScanner;
 internal class PortScannerService
 {
     //Processa as informaçãos da UI
