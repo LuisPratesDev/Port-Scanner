@@ -8,11 +8,11 @@ namespace Scanner.Services.PortScanner;
 internal class PortScannerService
 {
     //Processa as informaçãos da UI
-    internal IAsyncEnumerable<ScanResult> Processing(HashSet<string> address, HashSet<string> ports)
+    internal IAsyncEnumerable<ScanResult> Processing(HashSet<Task<Result<IPAddress[]>>> address, HashSet<string> ports)
     {
         HashSet<Task<ScanEvent>> scanEvents = new();
 
-        foreach (Task<Result<IPAddress[]>> ip in ArgumentParser.ResolveAddresses(address))
+        foreach (Task<Result<IPAddress[]>> ip in address)
         {
            scanEvents.Add(CreateScanEvent(ip));
         }
