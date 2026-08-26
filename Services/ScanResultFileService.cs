@@ -4,6 +4,7 @@ using Scanner.Services.PortScanner;
 namespace Scanner.Services.ScanResultFile;
 internal class ScanResultFileService
 {
+    //Retorna os scans completos em ordem de chegada para o UI e salva em um arquivo temporário
     internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<string> address, HashSet<string> ports)
     {
         string filePath = PathFileTemp();
@@ -20,6 +21,7 @@ internal class ScanResultFileService
             yield return scanResult;
         }
     }
+    //Move o arquivo temporário para o diretório desejado
     internal (bool Success, string message) MoveFileCompleted(string directory)
     {
         try
@@ -55,6 +57,7 @@ internal class ScanResultFileService
             );
         }
     }
+    //Retorna o caminho do arquivo temporário
     private string PathFileTemp()
     {
         string pathFileTemp = Path.GetFullPath("ScanTemp.txt");
