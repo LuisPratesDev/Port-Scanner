@@ -1,11 +1,13 @@
+using System.Net;
 using Scanner.Models;
+using Scanner.Response;
 using Scanner.Services.PortScanner;
 
 namespace Scanner.Services.ScanResultFile;
 internal class ScanResultFileService
 {
     //Retorna os scans completos em ordem de chegada para o UI e salva em um arquivo temporário
-    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<string> address, HashSet<string> ports)
+    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<Task<Result<IPAddress[]>>> address, HashSet<string> ports)
     {
         string filePath = PathFileTemp();
 
