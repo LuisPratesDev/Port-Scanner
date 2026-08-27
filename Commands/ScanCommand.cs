@@ -20,23 +20,31 @@ internal class Scan
             {
                 ScanResult result = (ScanResult)eventTask.Data;
                 yield return result;
+                continue;
             }
 
-            if (eventTask.Type == Event.Type.Dns)
+            Result<IPAddress[]> ips = (Result<IPAddress[]>)eventTask.Data;
+
+            if (!ips.Success || ips.Data == null) continue;
+
+            foreach (IPAddress ip in ips.Data)
             {
-                Result<IPAddress[]> ips = (Result<IPAddress[]>)eventTask.Data;
-
-                if (!ips.Success || ips.Data == null) continue;
-
-                foreach (IPAddress ip in ips.Data)
+                foreach(ushort port in ports)
                 {
-                    foreach(ushort port in ports)
-                    {
-                        scanEvents.Add(CreatePortScanEvent(HostResolverService.PortIsOpen(ip, port)));
-                    }
+                    scanEvents.Add(CreatePortScanEvent(HostResolverService.PortIsOpen(ip, port)));
                 }
             }
         }
+    }
+    //transforma um Task<Result<IPAddress[]>> para Task<ScanEvent>
+    internal async Task<ScanEvent> CreateScanEvent(Task<Result<IPAddress[]>> ip)
+    {
+        ScanEvent scanEvent = new ScanEvent(
+            Event.Type.Dns,
+            await ip
+        );
+
+        return scanEvent;
     }
 
     //Converte um Task<ScanResult> para Task<ScanEvent> para o fluxo do código continuar
