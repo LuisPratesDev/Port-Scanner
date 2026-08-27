@@ -37,7 +37,7 @@ internal class Scan
         }
     }
     //transforma um Task<Result<IPAddress[]>> para Task<ScanEvent>
-    internal async Task<ScanEvent> CreateScanEvent(Task<Result<IPAddress[]>> ip)
+    internal static async Task<ScanEvent> CreateScanEvent(Task<Result<IPAddress[]>> ip)
     {
         ScanEvent scanEvent = new ScanEvent(
             Event.Type.Dns,
