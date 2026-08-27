@@ -1,5 +1,6 @@
 using Spectre.Console;
 
+namespace Scanner.UI.Prompt.Scan;
 internal class ScanPrompt
 {
     //Pergunta ao usuário os host que ele quer usar para escanear
