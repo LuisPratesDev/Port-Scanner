@@ -24,12 +24,12 @@ internal class ScanPrompt
 
         string info = string.Empty;
 
+        AnsiConsole.MarkupLine($"[yellow]{phrase}[/]");
+        AnsiConsole.MarkupLine("[blue]! Aperte 'Enter' para continuar[/]");
+
         do
         {
-            AnsiConsole.MarkupLine($"[yellow]{phrase}[/]");
-            AnsiConsole.MarkupLine("[blue]! Aperte 'Enter' para continuar[/]");
-
-            TextPrompt<string> infoAsk = new TextPrompt<string>(": ").
+            TextPrompt<string> infoAsk = new TextPrompt<string>("").
             DefaultValue("")
             .AllowEmpty();
 
@@ -42,15 +42,19 @@ internal class ScanPrompt
                 result.Add(address);
             }
 
-            if (splitInfoSpace.Length == 0)
+            if (splitInfoSpace.Length == 0 && !string.IsNullOrEmpty(info))
             {
                 result.Add(info);
             }
 
-            AnsiConsole.MarkupLine($"[green]{type} adicionados: {result.Count}[/]");
-
         } while(info != string.Empty);
 
+        AnsiConsole.MarkupLine($"[green]{type} adicionados: {result.Count}[/]");
+
+        Console.ReadKey(true);
+
+        AnsiConsole.Clear();
+        
         return result;
     }
 }
