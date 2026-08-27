@@ -7,7 +7,7 @@ namespace Scanner.Services.ScanResultFile;
 internal class ScanResultFileService
 {
     //Retorna os scans completos em ordem de chegada para o UI e salva em um arquivo temporário
-    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<Task<Result<IPAddress[]>>> address, HashSet<string> ports)
+    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<Task<Result<IPAddress[]>>> address, HashSet<ushort> ports)
     {
         string filePath = PathFileTemp();
 
