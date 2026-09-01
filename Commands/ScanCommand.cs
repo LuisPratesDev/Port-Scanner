@@ -6,32 +6,17 @@ namespace Scanner.Commands;
 internal class Scan
 {
     //Pode escanear multiplos ips com multiplas portas ou apenas um ip com uma porta
-    internal static async IAsyncEnumerable<ScanResult> ScannerPorts(HashSet<Task<ScanEvent>> scanEvents, HashSet<ushort> ports)
+    internal static IEnumerable<Task<ScanEvent>> ScannerPorts(Result<IPAddress[]> result, HashSet<ushort> ports)
     {
-        while (scanEvents.Count > 0)
+        if (result.Data != null)
         {
-            Task<ScanEvent> task = await Task.WhenAny(scanEvents);
-
-            scanEvents.Remove(task);
-
-            ScanEvent eventTask = await task;
-
-            if (eventTask.Type == Event.Type.PortScanner)
-            {
-                ScanResult result = (ScanResult)eventTask.Data;
-                yield return result;
-                continue;
-            }
-
-            Result<IPAddress[]> ips = (Result<IPAddress[]>)eventTask.Data;
-
-            if (!ips.Success || ips.Data == null) continue;
-
-            foreach (IPAddress ip in ips.Data)
+            foreach (IPAddress ip in result.Data)
             {
                 foreach(ushort port in ports)
                 {
-                    scanEvents.Add(CreatePortScanEvent(HostResolverService.PortIsOpen(ip, port)));
+                    yield return CreatePortScanEvent(
+                        HostResolverService.PortIsOpen(ip, port)
+                    );
                 }
             }
         }
