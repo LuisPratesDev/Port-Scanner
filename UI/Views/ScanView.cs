@@ -1,112 +1,112 @@
-using System.Net;
+using System.Threading.Channels;
 using Spectre.Console;
 
-using Scanner.Services.PortScanner;
 using Scanner.Models;
-using Scanner.Response;
 using Scanner.UI.Prompt.Scan;
-using Scanner.Parsers;
+using Scanner.Services.PortScanner;
 
-namespace Scanner.UI.Scan.View;
+namespace Scanner.UI.View;
+
 internal class ScanView
 {
-    private int ResolvedHost;
-    private int ScanCompleted;
-    private int ScanSucess;
-    private int ScanFailed;
-    internal async void Main()
+    internal async Task RunScanAsync(
+        Channel<Task<ScanEvent>> channel,
+        CancellationToken cancellationToken
+    )
     {
-        PortScannerService portScanner = new();
-
         HashSet<string> inputHosts = ScanPrompt.AskHosts();
         HashSet<string> inputPorts = ScanPrompt.AskPorts();
 
-        HashSet<ushort> ports = ArgumentParser.ValidatePorts(inputPorts)
-        .Where(port => port.Success)
-        .Select(port => port.Data)
-        .ToHashSet();
-
         Layout root = CreateLayout();
-
-        HashSet<Task<Result<IPAddress[]>>> resolvedHosts = ArgumentParser.ResolveAddresses(inputHosts);
-
-        IAsyncEnumerable<ScanResult> scanResults = portScanner.Processing(resolvedHosts, ports);
-
-        while (resolvedHosts.Count > 0)
+        
+        await AnsiConsole.Live(root)
+        .StartAsync(async display =>
         {
-            Task<Result<IPAddress[]>> task =  await Task.WhenAny(resolvedHosts);
+            Task producer = PortScanner.ProcessingDns(
+                channel.Writer,
+                inputHosts,
+                cancellationToken
+            );
 
-            resolvedHosts.Remove(task);
-            
-            Result<IPAddress[]> completedTask = await task;
+            ScanProgress progress = ScanProgress.Create(
+                hosts: 0,
+                ports: 0,
+                total: 0,
+                completed: 0,
+                success: 0,
+                failed: 0
+            );
 
-            AnsiConsole.Live(root)
-            .AutoClear(true)
-            .Start(ctx =>
+            await foreach (
+                ScanProgress scanResult
+                in PortScanner.ConsumeScanEvents(
+                    channel.Reader,
+                    inputPorts,
+                    progress
+                )
+            )
             {
+
                 root["main"]["info"].Update(
-                    ChangeContentHost(inputHosts, completedTask, ports)
+                    ChangeContentScan(
+                        progress,
+                        inputHosts,
+                        inputPorts
+                    )
                 );
 
-                ctx.UpdateTarget(root);
-            });
-        }
+                display.Refresh();
+            }
 
+            await producer;
+        });
     }
-    private Panel ChangeContentHost(HashSet<string> inputHosts, Result<IPAddress[]> resolved, HashSet<ushort> ports)
+
+    private Panel ChangeContentScan(
+        ScanProgress progress,
+        HashSet<string> inputHosts,
+        HashSet<string> inputPorts
+    )
     {
-        foreach(IPAddress ips in resolved.Data!)
-        {
-            ResolvedHost++;
-        }
-
         return new Panel(
-            $"[green]Processing hosts...[/]\n\n" +
+            $"[green]Processing scans...[/]\n\n" +
 
-            $"Inputs: {inputHosts.Count}\n" +
-            $"Resolved: {ResolvedHost}\n" +
-            $"Ports: {ports.Count}"
+            $"Input Hosts: {inputHosts.Count}\n" +
+            $"Input Ports: {inputPorts.Count}\n" +
+            $"Hosts Valid: {progress.Hosts}\n" +
+            $"Ports Valid: {progress.Ports}\n" +
+            $"Total Valid: {progress.Total}\n\n" +
+
+            $"Completed: {progress.Completed}\n" +
+            $"Success: {progress.Success}\n" +
+            $"Failed: {progress.Failed}"
         );
     }
-    private Panel ChangeContentScan(ScanResult scanResult, HashSet<ushort> ports)
-    {
-        ScanCompleted++;
 
-        if (scanResult.Status != System.Net.Sockets.SocketError.Success) ScanFailed++;
-
-        else ScanSucess++;
-
-        return new Panel(
-            $"[green]Processing scans...[/]\n\n"+
-
-            $"Hosts: {ResolvedHost}\n" +
-            $"Ports: {ports.Count}\n" +
-            $"Total: {ResolvedHost*ports.Count}\n\n" +
-
-            $"Completed: {ScanCompleted}\n" +
-            $"Success: {ScanSucess}\n" +
-            $"Failed: {ScanFailed}"
-        );
-    }
     private static Layout CreateLayout()
     {
         Layout root = new Layout("root");
-        
+
         root.SplitRows(
-            new Layout("main")
-            .Ratio(1)
+            new Layout("main").Ratio(1)
         );
 
         root["main"].SplitRows(
             new Layout(
-                "info", 
+                "info",
                 new Panel(
                     new Markup(
-                        "[green]Processing hosts...[/]\n\n" +
+                        $"[green]Processing scans...[/]\n\n" +
 
-                        "Inputs: 0\n" +
-                        "Resolved: 0\n" +
-                        "Ports: 0"
+                        $"Input Hosts: 0\n" +
+                        $"Input Ports: 0\n" +
+                        $"Hosts Valid: 0\n" +
+                        $"Ports Valid: 0\n" +
+                        $"Total Valid: 0\n\n" +
+
+                        $"Completed: 0\n" +
+                        $"Success: 0\n" +
+                        $"Failed: 0"
                     )
                 ).Collapse()
             )
