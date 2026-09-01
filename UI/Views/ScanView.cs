@@ -9,6 +9,7 @@ namespace Scanner.UI.View;
 
 internal class ScanView
 {
+    //Executa a visualização dos resultados dos scans de acordo com os inputs
     internal async Task RunScanAsync(
         Channel<Task<ScanEvent>> channel,
         CancellationToken cancellationToken
@@ -22,6 +23,7 @@ internal class ScanView
         await AnsiConsole.Live(root)
         .StartAsync(async display =>
         {
+            // Inicia a produção dos eventos de resolução DNS no channel.
             Task producer = PortScanner.ProcessingDns(
                 channel.Writer,
                 inputHosts,
@@ -37,6 +39,7 @@ internal class ScanView
                 failed: 0
             );
 
+            // Consome os eventos produzidos pelo scanner conforme são concluídos.
             await foreach (
                 ScanProgress scanResult
                 in PortScanner.ConsumeScanEvents(
@@ -48,7 +51,7 @@ internal class ScanView
             {
 
                 root["main"]["info"].Update(
-                    ChangeContentScan(
+                    CreateScanProgressPanel(
                         progress,
                         inputHosts,
                         inputPorts
@@ -58,11 +61,12 @@ internal class ScanView
                 display.Refresh();
             }
 
+            // Garante que o produtor conclua antes de encerrar a execução da View.
             await producer;
         });
     }
 
-    private Panel ChangeContentScan(
+    private Panel CreateScanProgressPanel(
         ScanProgress progress,
         HashSet<string> inputHosts,
         HashSet<string> inputPorts
@@ -83,6 +87,7 @@ internal class ScanView
         );
     }
 
+    // Cria a estrutura inicial utilizada pela interface durante o escaneamento.
     private static Layout CreateLayout()
     {
         Layout root = new Layout("root");
