@@ -4,6 +4,8 @@ using Spectre.Console;
 using Scanner.Models;
 using Scanner.UI.Prompt.Scan;
 using Scanner.Services.PortScanner;
+using Scanner.Response;
+using System.Net;
 
 namespace Scanner.UI.View;
 
@@ -11,7 +13,7 @@ internal class ScanView
 {
     //Executa a visualização dos resultados dos scans de acordo com os inputs
     internal async Task RunScanAsync(
-        Channel<Task<ScanEvent>> channel,
+        Channel<Result<IPAddress[]>> channel,
         CancellationToken cancellationToken
     )
     {
@@ -42,7 +44,7 @@ internal class ScanView
             // Consome os eventos produzidos pelo scanner conforme são concluídos.
             await foreach (
                 ScanProgress scanResult
-                in PortScanner.ConsumeScanEvents(
+                in PortScanner.ConsumeScanResults(
                     channel.Reader,
                     inputPorts,
                     progress
