@@ -1,27 +1,22 @@
 using System.Net;
 using Scanner.Models;
 using Scanner.Response;
-using Scanner.Services.PortScanner;
 
 namespace Scanner.Services.ScanResultFile;
 internal class ScanResultFileService
 {
     //Retorna os scans completos em ordem de chegada para o UI e salva em um arquivo temporário
-    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<Task<Result<IPAddress[]>>> address, HashSet<ushort> ports)
+    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(HashSet<Task<Result<IPAddress[]>>> address, HashSet<ushort> ports, ScanResult scanResult)
     {
         string filePath = PathFileTemp();
-
-        PortScannerService portScanner = new();
-
-        IAsyncEnumerable<ScanResult> scanResults = portScanner.Processing(address, ports);
         
         using StreamWriter streamWriter = new StreamWriter(filePath);
 
-        await foreach(ScanResult scanResult in scanResults)
-        {
-            streamWriter.WriteLine(scanResult.ToString());
-            yield return scanResult;
-        }
+        streamWriter.WriteLine(
+            scanResult.ToString()
+        );
+
+        yield return scanResult;
     }
     //Move o arquivo temporário para o diretório desejado
     internal (bool Success, string message) MoveFileCompleted(string directory)
