@@ -32,13 +32,26 @@ abstract class HostResolverService
 
         try
         {
-            await client.ConnectAsync(ip, port);
+            using CancellationTokenSource cts = new();
+
+            cts.CancelAfter(TimeSpan.FromSeconds(15));
+
+            await client.ConnectAsync(ip, port, cts.Token);
 
             return ScanResult.Create(
                 ip: ip,
                 port: port,
                 duration: stopwatch.Elapsed,
                 status: SocketError.Success
+            );
+        }
+        catch(OperationCanceledException)
+        {
+            return ScanResult.Create(
+                ip: ip,
+                port: port,
+                duration: stopwatch.Elapsed,
+                status: SocketError.TimedOut
             );
         }
         catch (SocketException ex)
