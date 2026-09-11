@@ -19,7 +19,7 @@ internal class PortScanner
     }
 
     internal static async Task ProcessingDns(
-        ChannelWriter<Task<ScanEvent>> writer,
+        ChannelWriter<Result<IPAddress[]>> writer,
         HashSet<string> inputHosts,
         CancellationToken cancellationToken)
     {
@@ -35,7 +35,7 @@ internal class PortScanner
                 pendingTasks.Remove(completedTask);
 
                 // Envia a tarefa concluída como um evento para o consumidor processar.
-                await writer.WriteAsync(Scan.CreateScanEvent(completedTask), cancellationToken);
+                await writer.WriteAsync(await completedTask, cancellationToken);
             }   
         }
         catch(OperationCanceledException)
@@ -47,99 +47,169 @@ internal class PortScanner
         }
     }
 
-    internal static async IAsyncEnumerable<ScanProgress> ConsumeScanEvents(
-        ChannelReader<Task<ScanEvent>> reader,
+    internal static async IAsyncEnumerable<ScanProgress> ConsumeScanResults(
+        ChannelReader<Result<IPAddress[]>> reader,
         HashSet<string> inputPorts,
         ScanProgress scanProgress
     )
     {
         // Mantém as tarefas de escaneamento iniciadas que ainda não foram concluídas.
-        List<Task<ScanEvent>> pendingTasks = new ();
+        List<Task<ScanResult>> pendingTasks = new ();
 
         // Mantém os enumeradores responsáveis por gerar novas tarefas de escaneamento.
-        Queue<IEnumerator<Task<ScanEvent>>> scans = new();
+        Queue<IEnumerator<Task<ScanResult>>> scans = new();
 
+        //Mostra a quantidade de portas válidas
         HashSet<ushort> validPorts = ValidatePorts(inputPorts);
-
-        bool enumeratorHasMoreItems;
 
         // Continua enquanto ainda existirem eventos no channel, escaneamentos pendentes
         // ou enumeradores capazes de gerar novos escaneamentos.
         while (!reader.Completion.IsCompleted || pendingTasks.Count != 0 || scans.Count != 0)
         {
-            enumeratorHasMoreItems = true;
+            await InitialCreateScanEnumerator(
+                scans,
+                pendingTasks,
+                reader,
+                scanProgress,
+                validPorts
+            );
 
-            // Garante uma tarefa pendente enquanto o channel ainda pode produzir eventos.
-            if (pendingTasks.Count == 0 && !reader.Completion.IsCompleted)
+            ConsumeItensInChannel(
+                reader,
+                scans,
+                scanProgress,
+                validPorts
+            );
+
+            int capacity = CalcCapacity(
+                validPorts,
+                scanProgress
+            );
+
+            AddScansAtPendingTask(
+                scans,
+                pendingTasks, 
+                capacity
+            );
+
+            if (pendingTasks.Count > 0)
             {
-                pendingTasks.Add(await reader.ReadAsync());
+                yield return await ResultCompleted(
+                    pendingTasks, 
+                    scanProgress
+                );
             }
-
-            // Aguarda a conclusão de qualquer escaneamento pendente.
-            Task<Task<ScanEvent>>  waitingScan = Task.WhenAny(pendingTasks);
-
-            // Aguarda a disponibilidade de um novo evento produzido pelo DNS.
-            Task<bool>  waitingNewTask = reader.WaitToReadAsync().AsTask();
-
-            // Processa primeiro aquilo que ocorrer antes: um novo evento ou
-            // a conclusão de um escaneamento já iniciado.
-            Task winnerTask = await Task.WhenAny(waitingNewTask, waitingScan);
-
-            ScanEvent completedTask;
-
-            if (winnerTask == waitingNewTask && await waitingNewTask)
-            {
-                completedTask = await await reader.ReadAsync();
-            }
-            else 
-            {
-                Task<ScanEvent> task = await waitingScan;
-                pendingTasks.Remove(task);
-                completedTask = await task;
-            }
-
-
-            if (completedTask.Type == Event.Type.PortScanner)
-            {
-                ScanResult scanResult = (ScanResult)completedTask.Data;
-
-                scanProgress.Completed++;
-
-                // Classifica o resultado do escaneamento como sucesso ou falha.
-                if (scanResult.Status != System.Net.Sockets.SocketError.Success) scanProgress.Failed++;
-
-                else scanProgress.Success++;
-
-                // Disponibiliza o progresso atualizado para a interface.
-                yield return scanProgress;
-            }
-
-            else {
-                Result<IPAddress[]> ips = (Result<IPAddress[]>)completedTask.Data;
-
-                if (ips.Data != null)
-                {
-                    // Adiciona um novo gerador de escaneamentos para os IPs resolvidos.
-                    scans.Enqueue(
-                        Scan.ScannerPorts(
-                            ips,
-                            validPorts
-                        ).GetEnumerator()
-                    );
-                    
-                    scanProgress.Hosts += ips.Data.Length;
-                    scanProgress.Ports = (ushort)validPorts.Count;
-                    scanProgress.Total = (uint)scanProgress.Hosts * scanProgress.Ports;
-                }
-            }
+        }
+    }
+    private static async Task<ScanProgress> ResultCompleted(
+        List<Task<ScanResult>> pendingTasks,
+        ScanProgress scanProgress
+    )
+    {
+        // Aguarda a conclusão de qualquer escaneamento pendente.
+        Task<ScanResult>  scanTask = await Task.WhenAny(pendingTasks);
+        
+        pendingTasks.Remove(scanTask);
             
+        ScanResult scanCompleted = await scanTask;
 
-            if (scans.Count > 0)
+        UpdateScanProgress(
+            scanProgress, 
+            scanCompleted
+        );
+
+        // Disponibiliza o progresso atualizado para a interface.
+        return scanProgress;
+    }
+    private static void UpdateScanProgress(
+        ScanProgress scanProgress,
+        ScanResult scanCompleted
+    )
+    {
+        scanProgress.Completed++;
+
+        // Classifica o resultado do escaneamento como falha.
+        if (scanCompleted.Status != System.Net.Sockets.SocketError.Success) scanProgress.Failed++;
+
+        else scanProgress.Success++;
+    }
+    private static void ConsumeItensInChannel(
+        ChannelReader<Result<IPAddress[]>> reader,
+        Queue<IEnumerator<Task<ScanResult>>> scans,
+        ScanProgress scanProgress,
+        HashSet<ushort> validPorts
+    )
+    {
+        //consome todos os itens disponíveis no channel
+        while(reader.TryRead(out Result<IPAddress[]>? item) && item.Data != null)
+        {
+            AddScansEnumerator(
+                scans: scans,
+                ips: item,
+                validPorts: validPorts,
+                scanProgress: scanProgress
+            );
+        }
+    }
+    private static int CalcCapacity(
+        HashSet<ushort> validPorts,
+        ScanProgress scanProgress
+    )
+    {
+        int totalScans = scanProgress.Hosts * validPorts.Count;
+
+        double baseCapacity = 500 * Math.Sqrt((double)totalScans / 1000);
+
+        double successRate = scanProgress.Completed == 0 ? 0 : (double)scanProgress.Success / scanProgress.Completed;
+
+        double maxPercentageOfWork = 0.6;
+
+        double relativeLimit = totalScans * maxPercentageOfWork;
+
+        double adaptiveCapacity = baseCapacity + (relativeLimit - baseCapacity) * successRate;
+
+        return (int)adaptiveCapacity;
+    }
+    private static async Task InitialCreateScanEnumerator(
+        Queue<IEnumerator<Task<ScanResult>>> scans,
+        List<Task<ScanResult>> pendingTasks,
+        ChannelReader<Result<IPAddress[]>> reader,
+        ScanProgress scanProgress,
+        HashSet<ushort> validPorts
+    )
+    {
+        if (pendingTasks.Count == 0 && scans.Count == 0 && !reader.Completion.IsCompleted)
+        {
+            Result<IPAddress[]> result = await reader.ReadAsync();
+
+            AddScansEnumerator(
+                scans: scans,
+                ips: result,
+                validPorts: validPorts,
+                scanProgress: scanProgress
+            );
+        }
+    }
+    private static void AddScansAtPendingTask(
+        Queue<IEnumerator<Task<ScanResult>>> scans,
+        List<Task<ScanResult>> pendingTasks,
+        int capacity
+    )
+    {
+        //Preenche o pendingTasks com as Tasks De ScanResult
+            if (scans.Count > 0 && pendingTasks.Count < capacity)
             {
-                IEnumerator<Task<ScanEvent>> enumerator = scans.Dequeue();
+                IEnumerator<Task<ScanResult>> enumerator = scans.Dequeue();
 
                 // Inicia novos escaneamentos até atingir o limite de tarefas pendentes.
-                while(pendingTasks.Count < 500)
+                int availablePositions = Math.Max(
+                    0,
+                    capacity - pendingTasks.Count
+                );
+
+                bool enumeratorHasMoreItems = true;
+
+                for (int i = 0; i < availablePositions; i ++)
                 {
                     if (enumerator.MoveNext())
                     {
@@ -160,6 +230,26 @@ internal class PortScanner
                 // Recoloca o enumerador na fila caso ainda existam tarefas a serem geradas.
                 if (enumeratorHasMoreItems) scans.Enqueue(enumerator);
             }
-        }
+    }
+    private static void AddScansEnumerator(
+        Queue<IEnumerator<Task<ScanResult>>> scans,
+        Result<IPAddress[]> ips, 
+        HashSet<ushort> validPorts, 
+        ScanProgress scanProgress)
+    {
+        if (ips.Data != null)
+        {
+            // Adiciona um novo gerador de escaneamentos para os IPs resolvidos.
+            scans.Enqueue(
+                Scan.ScannerPorts(
+                    ips,
+                    validPorts
+                ).GetEnumerator()
+            );
+            
+            scanProgress.Hosts += ips.Data.Length;
+            scanProgress.Ports = (ushort)validPorts.Count;
+            scanProgress.Total = (uint)scanProgress.Hosts * scanProgress.Ports;
+        }  
     }
 }
