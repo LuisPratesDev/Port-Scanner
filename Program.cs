@@ -19,5 +19,5 @@ ScanView scanView = new();
 
 await scanView.RunScanAsync(
     channel,
-    cts.Token
+    cts
 );
