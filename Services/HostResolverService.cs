@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using Scanner.Response;
 using Scanner.Models;
 using System.Diagnostics;
+using Scanner.Services.OutComeClassifier;
 
 namespace Scanner.Services.HostResolver;
 abstract class HostResolverService
@@ -24,7 +25,7 @@ abstract class HostResolverService
         }
     }
     // Verifica se uma porta está aberta em um endereço IPv4 ou IPv6.
-    internal static async Task<ScanResult> PortIsOpen(IPAddress ip, ushort port)
+    internal static async Task<ScanResult> ConnectionInPort(IPAddress ip, ushort port, CancellationToken appCancel)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
 
@@ -32,17 +33,22 @@ abstract class HostResolverService
 
         try
         {
-            using CancellationTokenSource cts = new();
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(
+                appCancel
+            );
 
-            cts.CancelAfter(TimeSpan.FromSeconds(15));
+            cts.CancelAfter(
+                TimeSpan.FromSeconds(2)
+            );
 
             await client.ConnectAsync(ip, port, cts.Token);
 
             return ScanResult.Create(
                 ip: ip,
                 port: port,
+                outCome: ScanOutcome.Open,
                 duration: stopwatch.Elapsed,
-                status: SocketError.Success
+                rawError: SocketError.Success
             );
         }
         catch(OperationCanceledException)
@@ -50,8 +56,12 @@ abstract class HostResolverService
             return ScanResult.Create(
                 ip: ip,
                 port: port,
+                outCome: Classifier.Classifying(
+                    error: SocketError.TimedOut, 
+                    appCancelled: false
+                ),
                 duration: stopwatch.Elapsed,
-                status: SocketError.TimedOut
+                rawError: SocketError.TimedOut
             );
         }
         catch (SocketException ex)
@@ -59,8 +69,12 @@ abstract class HostResolverService
             return ScanResult.Create(
                 ip: ip,
                 port: port,
+                outCome: Classifier.Classifying(
+                    error: ex.SocketErrorCode, 
+                    appCancelled: false
+                ),
                 duration: stopwatch.Elapsed,
-                status: ex.SocketErrorCode
+                rawError: ex.SocketErrorCode
             );
         }
     }
