@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Scanner.Response;
 using Scanner.Services.HostResolver;
@@ -18,11 +19,23 @@ internal static class ArgumentParser
         return tasks;
     }
     //Retorna todas as portas válidas
-    internal static IEnumerable<Result<ushort>> ValidatePorts(HashSet<string> ports)
+    internal static HashSet<ushort> ValidatePorts(HashSet<string> ports)
     {
+        HashSet<ushort> results = new();
         foreach(string port in ports)
         {
-            if (ushort.TryParse(port, out ushort correctPort)) yield return Result<ushort>.Ok(correctPort);
+            if 
+            (
+                ushort.TryParse(
+                    port.Trim(),
+                    out ushort correctPort
+                ) && 
+                correctPort >= 1
+            ) 
+                results.Add(
+                correctPort
+            );
         }
+        return results;
     }
 }
