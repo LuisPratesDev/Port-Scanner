@@ -1,43 +1,45 @@
 using Scanner.Models;
 using Scanner.Response;
 
-namespace Scanner.Respository.Scan;
-internal class ScanRepository
+namespace Scanner.Respository;
+internal class ScanRepository : IDisposable
 {
-    //Retorna os scans completos em ordem de chegada para o UI e salva em um arquivo temporário
-    internal async IAsyncEnumerable<ScanResult> SaveInfoInFileTemp(ScanResult scanResult)
+    StreamWriter streamWriter = File.AppendText(
+        Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "ScanTemp.txt"
+        )
+    );
+    public void Dispose()
     {
-        string filePath = PathFileTemp();
-        
-        using StreamWriter streamWriter = new StreamWriter(filePath);
-
-        streamWriter.WriteLine(
-            scanResult.ToString()
-        );
-
-        yield return scanResult;
+        streamWriter.Dispose();
     }
-    //Move o arquivo temporário para o diretório desejado
-    internal Result<string> MoveFileCompleted(string directory)
+    //Retorna os scans completos em ordem de chegada para o UI e salva em um arquivo temporário
+    internal Result<bool> SaveInfoInFileTemp(ScanResult scanResult)
     {
         try
         {
-            DateTime dateTime = DateTime.UtcNow;
-
+            streamWriter.WriteLine(scanResult);
+            return Result<bool>.Ok(); 
+        }
+        catch (Exception ex)
+        {
+            return Result<bool>.Error(
+                ex.Message
+            );
+        }
+    }
+    //Move o arquivo temporário para o diretório desejado
+    internal Result<string> MoveFileCompleted(
+        string scanTempPath, 
+        string scanResultPath
+    )
+    {
+        try
+        {
             File.Move(
-                Path.GetFullPath(
-                    "ScanTemp.txt"
-                ),
-                Path.Combine(
-                    directory,
-                    $"ScanResult-{
-                        dateTime.ToShortDateString()
-                        .Replace("/", "-")
-                    }_{
-                        dateTime.ToLongTimeString()
-                        .Replace(":", "-")
-                    }-.txt"
-                )
+                scanTempPath,
+                scanResultPath
             );
 
             return Result<string>.Ok(
@@ -50,17 +52,5 @@ internal class ScanRepository
                 error.Message
             );
         }
-    }
-    //Retorna o caminho do arquivo temporário
-    private string PathFileTemp()
-    {
-        string pathFileTemp = Path.GetFullPath("ScanTemp.txt");
-
-        if (File.Exists(pathFileTemp))
-        {
-            File.Delete(pathFileTemp);
-        }
-
-        return pathFileTemp;
     }
 }
