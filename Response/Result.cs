@@ -6,7 +6,7 @@ internal class Result<T>
     //Success retorna se a operação foi bem sucedida ou má sucedida
     internal bool Success { get; init; }
     //Errors é as mensagens de erros ao longo do percurso
-    internal List<string> Errors {get; init; }
+    internal List<string> Errors { get; init; }
 
     internal Result(bool success, List<string> errors, T? data = default)
     {
@@ -46,9 +46,9 @@ internal class Result<T>
         );
     }
     //Um método estáttico que permite a adição de erros em um objeto Result<T>
-    static internal Result<T> Error(Result<T> result, string addError)
+    internal Result<T> Error(string addError)
     {
-        result.Errors.Add(addError);
-        return result;
+        this.Errors.Add(addError);
+        return this;
     }
 }
