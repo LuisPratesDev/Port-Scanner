@@ -14,53 +14,62 @@ internal class ScanView
     //Executa a visualização dos resultados dos scans de acordo com os inputs
     internal async Task RunScanAsync(
         Channel<Result<IPAddress[]>> channel,
-        CancellationToken cancellationToken
+        CancellationTokenSource cts
     )
     {
-        HashSet<string> inputHosts = ScanPrompt.AskHosts();
-        HashSet<string> inputPorts = ScanPrompt.AskPorts();
+        HashSet<Task<Result<IPAddress[]>>> inputHosts = ScanPrompt.AskHosts();
+        HashSet<ushort> inputPorts = ScanPrompt.AskPorts();
 
+        // Inicia a produção dos eventos de resolução DNS no channel.
+        Task producer = PortScanner.ProcessingDns(
+            channel.Writer,
+            inputHosts,
+            cts.Token
+        );
+        
         Layout root = CreateLayout();
         
         await AnsiConsole.Live(root)
         .StartAsync(async display =>
         {
-            // Inicia a produção dos eventos de resolução DNS no channel.
-            Task producer = PortScanner.ProcessingDns(
-                channel.Writer,
-                inputHosts,
-                cancellationToken
-            );
 
-            ScanProgress progress = ScanProgress.Create(
+            ScanProgress progress = new ScanProgress(
                 hosts: 0,
+                failedHosts: 0,
                 ports: 0,
                 total: 0,
                 completed: 0,
                 success: 0,
-                failed: 0
+                failedConnections: 0
             );
 
             // Consome os eventos produzidos pelo scanner conforme são concluídos.
-            await foreach (
-                ScanProgress scanResult
-                in PortScanner.ConsumeScanResults(
-                    channel.Reader,
-                    inputPorts,
-                    progress
-                )
-            )
+            try
             {
-
-                root["main"]["info"].Update(
-                    CreateScanProgressPanel(
+                await foreach (
+                    ScanResult scanResult
+                    in PortScanner.ConsumeScanResults(
+                        channel.Reader,
+                        inputPorts,
                         progress,
-                        inputHosts,
-                        inputPorts
+                        cts.Token
                     )
-                );
+                )
+                {
+                    root["main"]["info"].Update(
+                        CreateScanProgressPanel(
+                            progress,
+                            inputHosts,
+                            inputPorts
+                        )
+                    );
 
-                display.Refresh();
+                    display.Refresh();
+                }
+            }
+            catch
+            {
+                
             }
 
             // Garante que o produtor conclua antes de encerrar a execução da View.
@@ -68,10 +77,10 @@ internal class ScanView
         });
     }
 
-    private Panel CreateScanProgressPanel(
+    private static Panel CreateScanProgressPanel(
         ScanProgress progress,
-        HashSet<string> inputHosts,
-        HashSet<string> inputPorts
+        HashSet<Task<Result<IPAddress[]>>> inputHosts,
+        HashSet<ushort> inputPorts
     )
     {
         return new Panel(
@@ -79,13 +88,14 @@ internal class ScanView
 
             $"Input Hosts: {inputHosts.Count}\n" +
             $"Input Ports: {inputPorts.Count}\n" +
-            $"Hosts Valid: {progress.Hosts}\n" +
+            $"Hosts Valid: {progress.Hosts}\n" + 
+            $"Hosts Failed: {progress.FailedHosts}\n" +
             $"Ports Valid: {progress.Ports}\n" +
             $"Total Valid: {progress.Total}\n\n" +
 
             $"Completed: {progress.Completed}\n" +
             $"Success: {progress.Success}\n" +
-            $"Failed: {progress.Failed}"
+            $"Failed: {progress.FailedConnections}"
         );
     }
 
@@ -101,21 +111,19 @@ internal class ScanView
         root["main"].SplitRows(
             new Layout(
                 "info",
-                new Panel(
-                    new Markup(
-                        $"[green]Processing scans...[/]\n\n" +
-
-                        $"Input Hosts: 0\n" +
-                        $"Input Ports: 0\n" +
-                        $"Hosts Valid: 0\n" +
-                        $"Ports Valid: 0\n" +
-                        $"Total Valid: 0\n\n" +
-
-                        $"Completed: 0\n" +
-                        $"Success: 0\n" +
-                        $"Failed: 0"
-                    )
-                ).Collapse()
+                CreateScanProgressPanel(
+                    new ScanProgress(
+                        hosts: 0,
+                        failedHosts: 0,
+                        ports: 0,
+                        total: 0,
+                        completed: 0,
+                        success: 0,
+                        failedConnections: 0
+                    ),
+                    new HashSet<Task<Result<IPAddress[]>>>(),
+                    new HashSet<ushort>()
+                )
             )
         );
 
